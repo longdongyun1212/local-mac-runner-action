@@ -1,4 +1,3 @@
-# local-mac-runner-action/action.yml
 name: Local Mac CI Cluster
 description: 接入组织自有10台Mac自托管CI集群，原有runs-on: macos-latest无需修改
 author: Local Mac Admin
