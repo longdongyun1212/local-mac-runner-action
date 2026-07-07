@@ -1,22 +1,22 @@
-name: Local Mac CI Cluster
-description: 接入组织自有10台Mac自托管CI集群，原有runs-on: macos-latest无需修改
-author: Local Mac Admin
+name: "Local Mac CI Cluster"
+description: "接入组织自有10台Mac自托管CI集群，原有runs-on: macos-latest无需修改"
+author: "Local Mac Admin"
 
 branding:
-  icon: cpu
-  color: purple
+  icon: "cpu"
+  color: "purple"
 
 inputs:
   placeholder_param:
-    description: 预留扩展参数，业务使用无需填写
+    description: "预留扩展参数，业务使用无需填写"
     required: false
     default: ""
 
 runs:
-  using: composite
+  using: "composite"
   steps:
-    - name: 提示已接入本地Mac算力池
-      shell: bash
+    - name: "提示已接入本地Mac算力池"
+      shell: "bash"
       run: |
         echo "======================================"
         echo "✅ 成功绑定组织本地Mac CI集群"
