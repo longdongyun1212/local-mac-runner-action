@@ -10,6 +10,7 @@ inputs:
   scheme:
     description: "Xcode Scheme 名称（必需）"
     required: true
+    default: "Kingfisher"
   project:
     description: "Xcode Project 路径，如 MyApp.xcodeproj（与 workspace 二选一）"
     required: false
