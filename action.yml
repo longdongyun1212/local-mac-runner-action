@@ -10,8 +10,12 @@ inputs:
   scheme:
     description: "Xcode Scheme 名称（必需）"
     required: true
+  project:
+    description: "Xcode Project 路径（如 Kingfisher.xcodeproj），与 workspace 二选一"
+    required: false
+    default: ""
   workspace:
-    description: "Xcode Workspace 路径（如使用 .xcodeproj 则留空）"
+    description: "Xcode Workspace 路径（如 YourApp.xcworkspace），与 project 二选一"
     required: false
     default: ""
   configuration:
@@ -61,36 +65,58 @@ runs:
       id: build
       shell: "bash"
       run: |
-        WORKSPACE_FLAG=""
+        PROJECT_FLAG=""
         if [ -n "${{ inputs.workspace }}" ]; then
-          WORKSPACE_FLAG="-workspace ${{ inputs.workspace }}"
+          echo "🔧 使用 Workspace: ${{ inputs.workspace }}"
+          PROJECT_FLAG="-workspace ${{ inputs.workspace }}"
+        elif [ -n "${{ inputs.project }}" ]; then
+          echo "🔧 使用 Project: ${{ inputs.project }}"
+          PROJECT_FLAG="-project ${{ inputs.project }}"
         else
-          PROJECT_FILE=$(ls *.xcodeproj 2>/dev/null | head -1)
+          # 自动查找 .xcodeproj 目录
+          PROJECT_FILE=$(find . -maxdepth 1 -name "*.xcodeproj" -type d | head -1 | sed 's|^\./||')
           if [ -z "$PROJECT_FILE" ]; then
-            echo "错误：未找到 .xcodeproj 文件，请指定 workspace"
+            echo "❌ 错误：未找到 .xcodeproj 文件，请指定 project 或 workspace"
             exit 1
           fi
-          WORKSPACE_FLAG="-project $PROJECT_FILE"
+          echo "🔧 自动检测到 Project: $PROJECT_FILE"
+          PROJECT_FLAG="-project $PROJECT_FILE"
         fi
 
-        xcodebuild $WORKSPACE_FLAG \
+        echo "📦 开始编译..."
+        xcodebuild $PROJECT_FLAG \
           -scheme "${{ inputs.scheme }}" \
           -configuration "${{ inputs.configuration }}" \
           -derivedDataPath ./build \
           CODE_SIGNING_ALLOWED=NO
 
+        if [ $? -eq 0 ]; then
+          echo "✅ 编译成功"
+        else
+          echo "❌ 编译失败"
+          exit 1
+        fi
+
     - name: "导出 IPA"
       shell: "bash"
       run: |
         mkdir -p ./output
+        echo "📦 尝试导出 IPA..."
         xcodebuild -exportArchive \
           -archivePath ./build/Build/Products/${{ inputs.configuration }}/*.xcarchive \
           -exportPath ./output \
           -exportOptionsPlist ./ExportOptions.plist \
           -allowProvisioningUpdates || echo "⚠️ 导出失败（可能缺少签名配置）"
         IPA_FILE=$(ls ./output/*.ipa 2>/dev/null | head -1)
-        echo "app_path=$IPA_FILE" >> $GITHUB_OUTPUT
-        echo "app_name=$(basename $IPA_FILE 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+        if [ -n "$IPA_FILE" ]; then
+          echo "✅ IPA 导出成功: $IPA_FILE"
+          echo "app_path=$IPA_FILE" >> $GITHUB_OUTPUT
+          echo "app_name=$(basename "$IPA_FILE")" >> $GITHUB_OUTPUT
+        else
+          echo "ℹ️ 未生成 IPA 文件（可能是库项目，无需导出）"
+          echo "app_path=" >> $GITHUB_OUTPUT
+          echo "app_name=" >> $GITHUB_OUTPUT
+        fi
 
     - name: "上传 IPA 到 GitHub Actions"
       if: inputs.upload_artifact == 'true'
@@ -99,3 +125,4 @@ runs:
         name: iOS-App-${{ inputs.scheme }}
         path: ./output/*.ipa
         retention-days: 30
+        if-no-files-found: ignore
