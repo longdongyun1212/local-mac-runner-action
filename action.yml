@@ -1,4 +1,4 @@
-name: "iOS Build Action"
+name: "Local Mac iOS Build Action"
 description: "可复用 iOS 构建 Action，支持 project 和 workspace"
 author: "Mac CI Team"
 
@@ -72,13 +72,11 @@ runs:
         echo "  Workspace: $INPUT_WORKSPACE"
         echo "  Configuration: $INPUT_CONFIGURATION"
 
-        # 参数校验
         if [ -z "$INPUT_SCHEME" ]; then
           echo "❌ 错误: scheme 是必填参数"
           exit 1
         fi
 
-        # 构建参数
         PROJECT_FLAG=""
         if [ -n "$INPUT_WORKSPACE" ]; then
           echo "🔧 使用 Workspace: $INPUT_WORKSPACE"
@@ -87,7 +85,6 @@ runs:
           echo "🔧 使用 Project: $INPUT_PROJECT"
           PROJECT_FLAG="-project $INPUT_PROJECT"
         else
-          # 自动检测 .xcodeproj
           PROJECT_FILE=$(find . -maxdepth 1 -name "*.xcodeproj" -type d | head -1 | sed 's|^\./||')
           if [ -z "$PROJECT_FILE" ]; then
             echo "❌ 错误: 未找到 .xcodeproj，请指定 project 或 workspace"
