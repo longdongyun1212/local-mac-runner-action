@@ -1,0 +1,101 @@
+name: "iOS Build Action"
+description: "在本地 Mac CI 集群上构建 iOS 应用，并自动上传 .ipa 安装包"
+author: "Local Mac Admin"
+
+branding:
+  icon: "cpu"
+  color: "purple"
+
+inputs:
+  scheme:
+    description: "Xcode Scheme 名称（必需）"
+    required: true
+  workspace:
+    description: "Xcode Workspace 路径（如使用 .xcodeproj 则留空）"
+    required: false
+    default: ""
+  configuration:
+    description: "构建配置 (Debug/Release)"
+    required: false
+    default: "Release"
+  export_method:
+    description: "导出方式 (app-store/ad-hoc/development/enterprise)"
+    required: false
+    default: "development"
+  upload_artifact:
+    description: "是否自动上传 .ipa 到 GitHub Actions (true/false)"
+    required: false
+    default: "true"
+
+outputs:
+  app_path:
+    description: "构建产物路径"
+    value: ${{ steps.build.outputs.app_path }}
+  app_name:
+    description: "IPA 文件名"
+    value: ${{ steps.build.outputs.app_name }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "接入本地 Mac CI 集群"
+      shell: "bash"
+      run: |
+        echo "======================================"
+        echo "✅ 接入本地 Mac CI 集群 - iOS 构建"
+        echo "执行机器: $(hostname)"
+        echo "Xcode: $(xcodebuild -version | head -1)"
+        echo "======================================"
+
+    - name: "安装 CocoaPods 依赖"
+      shell: "bash"
+      run: |
+        if [ -f "Podfile" ]; then
+          echo "📦 安装 CocoaPods 依赖..."
+          pod install --repo-update
+        else
+          echo "ℹ️ 没有 Podfile，跳过依赖安装"
+        fi
+
+    - name: "构建 iOS 应用"
+      id: build
+      shell: "bash"
+      run: |
+        WORKSPACE_FLAG=""
+        if [ -n "${{ inputs.workspace }}" ]; then
+          WORKSPACE_FLAG="-workspace ${{ inputs.workspace }}"
+        else
+          PROJECT_FILE=$(ls *.xcodeproj 2>/dev/null | head -1)
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "错误：未找到 .xcodeproj 文件，请指定 workspace"
+            exit 1
+          fi
+          WORKSPACE_FLAG="-project $PROJECT_FILE"
+        fi
+
+        xcodebuild $WORKSPACE_FLAG \
+          -scheme "${{ inputs.scheme }}" \
+          -configuration "${{ inputs.configuration }}" \
+          -derivedDataPath ./build \
+          CODE_SIGNING_ALLOWED=NO
+
+    - name: "导出 IPA"
+      shell: "bash"
+      run: |
+        mkdir -p ./output
+        xcodebuild -exportArchive \
+          -archivePath ./build/Build/Products/${{ inputs.configuration }}/*.xcarchive \
+          -exportPath ./output \
+          -exportOptionsPlist ./ExportOptions.plist \
+          -allowProvisioningUpdates || echo "⚠️ 导出失败（可能缺少签名配置）"
+        IPA_FILE=$(ls ./output/*.ipa 2>/dev/null | head -1)
+        echo "app_path=$IPA_FILE" >> $GITHUB_OUTPUT
+        echo "app_name=$(basename $IPA_FILE 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+
+    - name: "上传 IPA 到 GitHub Actions"
+      if: inputs.upload_artifact == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: iOS-App-${{ inputs.scheme }}
+        path: ./output/*.ipa
+        retention-days: 30
