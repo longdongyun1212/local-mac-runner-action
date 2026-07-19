@@ -118,7 +118,7 @@ runs:
           -exportOptionsPlist ./ExportOptions.plist \
           -allowProvisioningUpdates || echo "⚠️ 导出跳过（可能不需要签名）"
 
-        IPA_FILE=$(ls ./output/*.ipa 2>/dev/null | head -1)
+        IPA_FILE=$(ls ./output/*.ipa 2>/dev/null | head -1 || true)
         if [ -n "$IPA_FILE" ]; then
           echo "✅ IPA 生成成功: $IPA_FILE"
           echo "app_path=$IPA_FILE" >> $GITHUB_OUTPUT
